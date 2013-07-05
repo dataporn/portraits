@@ -172,10 +172,77 @@ def portrait(G):
 	
 	return B[:max_path+1,:]
 
+# based on B_Distance.m
+def distance(mat1, mat2):
+	""" Distance between B-Matrix mat1 and mat2 """
+
+	ns, ms = mat1.shape
+	nl, ml = mat2.shape
+	size_to = max([ns,nl])
+
+	# pad smaller matrix with rows of zeros 
+	# except column 'zero' is # of nodes:
+	if ns < nl:
+		mat1 = numpy.vstack((
+			mat1,
+			numpy.hstack((
+				mat1[0,1] * numpy.ones((size_to - ns,1)),
+              	zeros((size_to - ns, ms - 1))
+			))
+		))
+	else:
+		mat2 = numpy.vstack((
+			mat2, 
+			numpy.hstack((
+				mat2[0,1] * numpy.ones((size_to - nl,1)), 
+				zeros((size_to - nl, ml - 1))
+			))
+		))
+
+	# pad columns with zeros, to align CDFs:
+	if ms < ml:
+		mat1 = numpy.hstack((mat1, zeros((size_to, ml - ms))))
+	else:
+		mat2 = numpy.hstack((mat2, zeros((size_to, ms - ml))))
+
+	# Get row-wise test statistic:
+	K = zeros((size_to,1))
+
+	C1 = bcdf(mat1)
+	C2 = bcdf(mat2)
+	for i in range(1,size_to):
+		K[i] = max(abs(C1[i,] - C2[i,]))
+
+	# shell weights:
+	b = numpy.sum(mat1, axis = 1) + numpy.sum(mat2, axis = 1)
+	return numpy.dot(b.conj().transpose(),K) / numpy.sum(b)
+		
+# based on Bcdf.m
+def bcdf(B):
+	""" compute the matrix of cumulative distributions of B """
+	n,m = numpy.shape(B)
+	C = zeros((n,m))
+
+	row_sum = numpy.sum(B, axis = 1)
+	for i in range(0,n):
+		if row_sum[i].any() > 0:
+			C[i,] = B[i,].cumsum() / row_sum[i]
+		else: # avoid this by including column 'zero' in B:
+			C[i,] = numpy.ones((1,m)); # ones or zeros or 0.5's?
+
+	return C
 
 if __name__ == '__main__':
-	G = igraph.Graph.Read_Edgelist(sys.argv[1])
-	B = portrait(G)
+	G1 = igraph.Graph.Read_Edgelist(sys.argv[1])
+	G2 = igraph.Graph.Read_Edgelist(sys.argv[2])
+	B1 = portrait(G1)
+	B2 = portrait(G2)
+
+	D = distance(B1, B2)
+	print D
+
+	sys.exit()
+
 	try: # plot the portrait with pylab, but I prefer matlab:
 		import pylab
 		plotMatrix(B, origin=1, logColors=True, show=True)

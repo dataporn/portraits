@@ -65,13 +65,11 @@ diameter(g::GenericGraph) = 5
 function portrait(g::GenericGraph)
 
     dia = diameter(g)
-    println(dia)
 	bmatrix = zeros(
         dia + 1, 
         num_vertices(g)
     )
 	
-    println(size(bmatrix))
     max_path = 1
 	for v in vertices(g)
 		distances = sort(filter(n -> n !== -1, gdistances(g, v)))
@@ -82,24 +80,17 @@ function portrait(g::GenericGraph)
             max_path = curr_max_path
         end
 
-        println(distances)
 		# build individual distribution
 		distribution = counter(distances)
-        println(distribution)
 		for (shell, count) in distribution
-            println(shell, count)
 		    bmatrix[shell + 1, count + 1] += 1
         end
-
-        println("A", bmatrix)
 			
         max_shell = dia 
         while max_shell > max_node_distances
             bmatrix[max_shell + 1, 1] += 1
             max_shell -= 1
         end
-
-        println("B",bmatrix)
     end
     return bmatrix[1:max_path+1,:]
 end
@@ -167,5 +158,3 @@ function bcdf(B::Matrix)
 
 	return C
 end
-
-nothing

@@ -43,45 +43,69 @@ using DataStructures
 
 typealias BMatrix Matrix
 
-function portrait(g::GenericGraph)
-	# return matrix where M[i,j] is the number of starting nodes in G
-	# with j nodes in shell i.
-
-	# dia = diameter(g)
-    dia = 500
-	N = num_vertices(g)
-	B = zeros(dia + 1, N) 
-	
-	max_path = 1
-	for v in vertices(g)
-		distances = gdistances(g, v)
-
-		# build individual distribution:
-		distribution = counter(distances)
-		for (shell, count) in distribution
-            if shell !== -1
-			    B[shell+1,count] += 1
-            end
-        end
-			
-		max_distance = maximum(distances)
-		if max_distance > max_path
-			max_path = max_distance
-        end
-
-		# HACK: count starting nodes that have zero nodes in farther shells
-		max_shell = dia
-		while max_shell > max_distance
-			B[max_shell,1] += 1
-			max_shell -= 1
+#=
+function diameter(g::GenericGraph)
+    lengths = Array(Int,0)
+    weights = zeros(num_edges(g))
+    for source in vertices(g)
+        for target in vertices(g)
+            sp = shortest_path(g, weights, source, target)
+            push!(lengths, length(sp))
+            println(lengths)
         end
     end
-	return B
+    return maximum(lengths)
+end
+=#
+
+diameter(g::GenericGraph) = 5
+
+# return matrix where M[i,j] is the number of starting nodes in G
+# with j nodes in shell i.
+function portrait(g::GenericGraph)
+
+    dia = diameter(g)
+    println(dia)
+	bmatrix = zeros(
+        dia + 1, 
+        num_vertices(g)
+    )
+	
+    println(size(bmatrix))
+    max_path = 1
+	for v in vertices(g)
+		distances = sort(filter(n -> n !== -1, gdistances(g, v)))
+
+        max_node_distances = maximum(distances)
+        curr_max_path = max_node_distances
+        if curr_max_path > max_path
+            max_path = curr_max_path
+        end
+
+        println(distances)
+		# build individual distribution
+		distribution = counter(distances)
+        println(distribution)
+		for (shell, count) in distribution
+            println(shell, count)
+		    bmatrix[shell + 1, count + 1] += 1
+        end
+
+        println("A", bmatrix)
+			
+        max_shell = dia 
+        while max_shell > max_node_distances
+            bmatrix[max_shell + 1, 1] += 1
+            max_shell -= 1
+        end
+
+        println("B",bmatrix)
+    end
+    return bmatrix[1:max_path+1,:]
 end
 
+# Distance between B-Matrix mat1 and mat2 
 function distance(mat1::BMatrix, mat2::BMatrix)
-    
-	# Distance between B-Matrix mat1 and mat2 
 
 	ns, ms = size(mat1)
 	nl, ml = size(mat2)
@@ -93,7 +117,7 @@ function distance(mat1::BMatrix, mat2::BMatrix)
 		mat1 = vcat(
 			mat1,
 			hcat(
-				mat1[0,1] * ones(size_to - ns, 1),
+				mat1[1,2] * ones(size_to - ns, 1),
               	zeros(size_to - ns, ms - 1)
 			)
 		)
@@ -101,7 +125,7 @@ function distance(mat1::BMatrix, mat2::BMatrix)
 		mat2 = vcat(
 			mat2, 
 			hcat(
-				mat2[1,1] * ones(size_to - nl,1), 
+				mat2[1,2] * ones(size_to - nl,1), 
 				zeros(size_to - nl, ml - 1)
 			)
 		)
@@ -114,45 +138,34 @@ function distance(mat1::BMatrix, mat2::BMatrix)
 		mat2 = hcat(mat2, zeros(size_to, ms - ml))
     end
 	# Get row-wise test statistic:
-	K = zeros(1, size_to)
+	K = zeros(size_to,1)
 
 	C1 = bcdf(mat1)
 	C2 = bcdf(mat2)
 	for i in 1:size_to
-        K[i] = maximum(abs(C1[i:end] - C2[i:end]))
+        K[i] = maximum( abs( C1[i,:] - C2[i,:] ) )
     end
 	# shell weights:
-	b = cumsum(mat1, 1) + cumsum(mat2, 1)
-	return 1 #dot(ctranspose(b),K) / cumsum(b)
+	b = sum(mat1, 2) + sum(mat2, 2)
+    D = b' * K / sum(b)
+    return D[1]
 end
 
+# compute the matrix of cumulative distributions of B
 function bcdf(B::Matrix)
-	# compute the matrix of cumulative distributions of B
 	n, m = size(B)
 	C = zeros(n,m)
 
-	row_sum = cumsum(B, 1)
+	row_sum = sum(B, 2)
 	for i in 1:n
 		if row_sum[i] > 0
-            C[i:end] = cumsum(B[i:end]) / row_sum[i]
+            C[i,:] = cumsum(B[i,:]) ./ row_sum[i]
 		else 
-            C[i:end] = ones(1,m)
+            C[i,:] = ones(1,m)
         end
     end
 
 	return C
 end
 
-function main()
-	G1 = simple_graph(3)
-	G2 = simple_graph(3)
-    add_edge!(G1, 1, 2)
-    add_edge!(G2, 1, 2)
-	B1 = portrait(G1)
-	B2 = portrait(G2)
-
-	D = distance(B1, B2)
-	println(D)
-end
-
-main()
+nothing
